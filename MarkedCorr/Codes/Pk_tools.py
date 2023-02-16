@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from matplotlib import colors, cm
 import matplotlib
 import os
-# import time
+import time
 
-def Fourier(field, Nmesh = 256, lbox=700,):
+def Fourier(field, Nmesh = 256, lbox=700, inverse=False):
     '''Return FFT of field
 
     
@@ -30,18 +30,25 @@ def Fourier(field, Nmesh = 256, lbox=700,):
     # cell width
     d = lbox / Nmesh
     # Take the Fourier Transform of the 3D box
-    complex_field = jnp.fft.fftn(field)
+    if inverse:
+        complex_field = jnp.fft.irfftn(field)
+    else:
+        complex_field = jnp.fft.rfftn(field)
+
      # natural wavemodes 
     kx =ky = kz = jnp.fft.fftfreq(Nmesh, d=d)* 2. * np.pi # h/Mpc
+
+    nx, ny, nz = complex_field.shape #shape of ft is symmetric 
+
      # Compute the total wave number
-    ktot = jnp.sqrt(kx[:,None, None]**2 + ky[None, :, None]**2+kz[None,None,:]**2)
+    ktot = jnp.sqrt(kx[:,None, None]**2 + ky[None, :, None]**2+kz[None,None,:]**2)[:nx, :ny, :nz]
     if np.isnan(complex_field).any():
         print('fourier transform is nan!')
         quit()
     return ktot, complex_field
 
 
-def np_Fourier(field, Nmesh = 256, lbox=700,):
+# def np_Fourier(field, Nmesh = 256, lbox=700,):
     '''Return FFT of field
 
     
@@ -79,8 +86,6 @@ def mark_10(p, b, delta_R):
     m = (1 + delta_R/(1+b))**(-p)
     return(m)
 
-# function optimized to run on gpu 
-
            
 def get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 256, nbins=206, kmin=0.01):
     """
@@ -97,6 +102,7 @@ def get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 256, nbins=206, k
     Returns:
      k-centers - 1D array of central k-bin values
      Pk - 1D array of k at each k 
+     n_cells- Number of k-modes in each bin
       
     """
     
@@ -107,9 +113,10 @@ def get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 256, nbins=206, k
         # print('calculating cross Pk')
    
     # Compute the squared magnitude of the complex numbers in the Fourier space, will give 3D Pk array
-    power_spectrum =  (fourier_data)*np.conjugate(second) #abs changes value here!
+    power_spectrum =  (fourier_data)*jnp.conjugate(second) #abs changes value here!
     
     if np.isnan(power_spectrum).any():
+        print('ERROR: power spectrum is nan')
         print('power spectrum is nan', power_spectrum)
         print('fourier data', fourier_data)
         print('SECOND ', second)
@@ -124,23 +131,15 @@ def get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 256, nbins=206, k
     kN = jnp.pi / d
 
 
-    # # natural wavemodes 
-    # kx =ky = kz = jnp.fft.fftfreq(Nmesh, d=d)* 2. * np.pi # h/Mpc
-    # # Compute the total wave number
-    # ktot = jnp.sqrt(kx[:,None, None]**2 + ky[None, :, None]**2+kz[None,None,:]**2)
-
     #bin the k to find the total at each |k|
-    n_cells, k_bins= np.histogram(ktot, bins=nbins,range=[kmin, kN] )
+    n_cells, k_bins= jnp.histogram(ktot, bins=nbins,range=[kmin, kN] )
     
     #power spectrum is average so weight by each 3D Pk value and sum,
-    sum_pk, k_bins= np.histogram(ktot, bins=nbins,range=[kmin, kN], weights=power_spectrum)  #range=[0.01, 10]
+    sum_pk, k_bins= jnp.histogram(ktot, bins=nbins,range=[kmin, kN], weights=power_spectrum)  #range=[0.01, 10]
 
     
     pk = sum_pk/n_cells #then divide by number averaged over
-    # pk.block_until_ready()
-    # if np.isnan(pk).any():
-        # print(f"Pk is nan! sum_pk = {sum_pk}, n_cells ={n_cells}")
-
+    
     #find center of k bins
     k_center =  (k_bins[1:] + k_bins[:-1])*.5
 
@@ -150,9 +149,9 @@ def get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 256, nbins=206, k
 
     from jax.lib import xla_bridge
     print(xla_bridge.get_backend().platform)  
-    return k_center, pk/vol
+    return k_center, n_cells, pk/vol
 
-def np_get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 512, nbins=244, kmin=0.01):
+# def np_get_Pk(fourier_data, ktot, second=None,lbox = 700, Nmesh = 512, nbins=244, kmin=0.01):
     """
     Get 1D power spectrum from an already painted field. <- need to do this without NBodykit?
     
@@ -216,11 +215,11 @@ def smooth_field(k, field, R):
     
     '''
     print('smoothing')
-    print(np.shape(k),np.shape(field))
+    print(np.shape(k),jnp.shape(field))
     W =  jnp.exp(-0.5*k*R**2)
     print('W',np.shape(W))
     smoothed_field = (W* field)
-    print(np.shape(smoothed_field), 'W*field')
+    print(jnp.shape(smoothed_field), 'W*field')
     # jnp.inner(W, field)
     return smoothed_field
 
