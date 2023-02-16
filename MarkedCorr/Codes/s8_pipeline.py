@@ -67,32 +67,42 @@ b=0.25
 # name = names[0] .
 print('s8')
 s8m= np.load(f's8_m_arr.npy')
-s8p= np.load(f's8_p_arr.npy')
+# s8p= np.load(f's8_p_arr.npy')
 
 #s8 m
 ktot, s8m_k_field = Fourier_jit(s8m)
 smoothed_field_s8m = smooth_jit(ktot, s8m_k_field, R)
 k, Pk_s8m = get_Pk_jit(s8m_k_field, ktot)
 #loop this?
-mark_s8m = mark_jit(p, b, smoothed_field_s8m)
-marked_field_s8m = s8m_k_field * mark_s8m
 
-k_marked, fft_marked_s8m = Fourier_jit(marked_field_s8m)
-k, Pk_md_s8m = get_Pk_jit(fft_marked_s8m, ktot, second = s8m_k_field)
+for b in jnp.linspace(-0.1, 2.0, 100):
+    for p in jnp.linspace(0, 10, 100):
+
+        mark_s8m = mark_jit(p, b, smoothed_field_s8m)
+        marked_field_s8m = s8m_k_field * mark_s8m
+
+        k_marked, fft_marked_s8m = Fourier_jit(marked_field_s8m)
+        k, Pk_mm_s8m = get_Pk_jit(fft_marked_s8m, ktot)
+        k, Pk_md_s8m = get_Pk_jit(fft_marked_s8m, ktot, second = s8m_k_field)
+        jnp.save(f'marked_pks/Pk_md_s8m_b={b}_p={p}', Pk_md_s8m)
+        jnp.save(f'marked_pks/Pk_mm_s8m_b={b}_p={p}', Pk_mm_s8m)
+
+        
+        
 
 
-#s8 p
-print('s8p')
+# #s8 p
+# print('s8p')
 
-ktot, s8p_k_field = Fourier_jit(s8p)
-smoothed_field_s8p = smooth_jit(ktot, s8p_k_field, R)
-k, Pk_s8p = get_Pk_jit(s8p_k_field, ktot)
-#loop this?
-mark_s8p = mark_jit(p, b, smoothed_field_s8p)
-marked_field_s8p = s8p_k_field * mark_s8p
+# ktot, s8p_k_field = Fourier_jit(s8p)
+# smoothed_field_s8p = smooth_jit(ktot, s8p_k_field, R)
+# k, Pk_s8p = get_Pk_jit(s8p_k_field, ktot)
+# #loop this?
+# mark_s8p = mark_jit(p, b, smoothed_field_s8p)
+# marked_field_s8p = s8p_k_field * mark_s8p
 
-k_marked, fft_marked_s8p = Fourier_jit(marked_field_s8p)
-k, Pk_md_s8p = get_Pk_jit(fft_marked_s8p, ktot, second = s8p_k_field)
+# k_marked, fft_marked_s8p = Fourier_jit(marked_field_s8p)
+# k, Pk_md_s8p = get_Pk_jit(fft_marked_s8p, ktot, second = s8p_k_field)
 
 # name = names[2]
 # print(name)
