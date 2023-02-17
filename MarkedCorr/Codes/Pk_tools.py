@@ -31,9 +31,9 @@ def Fourier(field, Nmesh = 256, lbox=700, inverse=False):
     d = lbox / Nmesh
     # Take the Fourier Transform of the 3D box
     if inverse:
-        complex_field = jnp.fft.irfftn(field)
+        complex_field = jnp.fft.irfftn(field, )
     else:
-        complex_field = jnp.fft.rfftn(field)
+        complex_field = jnp.fft.rfftn(field, )
 
      # natural wavemodes 
     kx =ky = kz = jnp.fft.fftfreq(Nmesh, d=d)* 2. * np.pi # h/Mpc
