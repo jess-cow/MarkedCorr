@@ -116,12 +116,16 @@ class Marker(object):
         # Return mark function (as callable) from a set of nodes
         r = np.sqrt(np.sum(nodes**2))
         if kind == 'spline':
-            return interp1d(delta_nodes, nodes/r, fill_value='extrapolate',
+            f = interp1d(delta_nodes, nodes/r, fill_value='extrapolate',
                             kind='cubic', bounds_error=False)
-        if kind == 'gp':
+        elif kind == 'gp':
             mark_hires = np.dot(self.filter_gp, nodes/r)
-            return interp1d(self.delta_hires, mark_hires, kind='linear')
-        raise KeyError(f"Unknonwn type {kind}")
+            f = interp1d(self.delta_hires, mark_hires, kind='linear')
+        else:
+            raise KeyError(f"Unknonwn type {kind}")
+        # Force to go through the origin
+        offset = f(0)
+        return lambda x : f(x)-offset
 
     def get_nodes_from_angles(self, angs):
         # Get node values from angles
