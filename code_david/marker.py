@@ -5,7 +5,8 @@ from scipy.optimize import minimize
 
 class Marker(object):
     def __init__(self, kmax=0.3, kmin=0.01, fom_type='total', lbox=700., ngrid=256,
-                 n_nodes=4, l_gp=2.0, A_gp=10.0, jitter_gp=1E-3, w_thr=1E-7, prefix=''):
+                 n_nodes=4, l_gp=2.0, A_gp=10.0, jitter_gp=1E-3, w_thr=1E-7, prefix='',
+                 fix_origin=False):
         self.prefix = prefix
         # Eigenvalue threshold
         self.w_thr = w_thr
@@ -29,10 +30,15 @@ class Marker(object):
         self.A_gp = A_gp
         # GP jitter
         self.jitter_gp = jitter_gp
+        self.fix_origin = fix_origin
 
         # Overdensity field nodes, GP covariance and associated GP filter
         self.n_nodes = n_nodes
         self.delta_nodes = (np.arange(self.n_nodes)+0.5)/self.n_nodes*(self.delta_range[1]-self.delta_range[0])+self.delta_range[0]
+        if self.fix_origin:
+            if 0.0 not in self.delta_nodes:
+                self.delta_nodes = np.sort(np.concatenate((self.delta_nodes, np.array([0.0]))))
+            self.not0 = self.delta_nodes != 0.0
         self.delta_hires = np.linspace(self.delta_range[0], self.delta_range[1], 128)
         self.inv_cov_nodes = np.linalg.inv(self.cov_gp(self.delta_nodes, self.delta_nodes))
         self.cov_nodes_hires = self.cov_gp(self.delta_hires, self.delta_nodes)
@@ -115,16 +121,21 @@ class Marker(object):
     def get_mark_from_nodes(self, nodes, kind='gp'):
         # Return mark function (as callable) from a set of nodes
         r = np.sqrt(np.sum(nodes**2))
+        if self.fix_origin:
+            nod = np.zeros_like(self.delta_nodes)
+            nod[self.not0] = nodes
+            nodes = nod
         if kind == 'spline':
-            f = interp1d(delta_nodes, nodes/r, fill_value='extrapolate',
-                            kind='cubic', bounds_error=False)
+            f = interp1d(self.delta_nodes, nodes/r, fill_value='extrapolate',
+                         kind='cubic', bounds_error=False)
         elif kind == 'gp':
             mark_hires = np.dot(self.filter_gp, nodes/r)
             f = interp1d(self.delta_hires, mark_hires, kind='linear')
         else:
             raise KeyError(f"Unknonwn type {kind}")
-        # Force to go through the origin
-        offset = f(0)
+
+        # Force to go through origin
+        offset = f(0.0)
         return lambda x : f(x)-offset
 
     def get_nodes_from_angles(self, angs):
