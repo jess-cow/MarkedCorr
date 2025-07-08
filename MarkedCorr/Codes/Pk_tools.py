@@ -54,13 +54,13 @@ def Fourier(field, Nmesh = 256, lbox=700, inverse=False):
 
 
 
-def mark_R(p, b, delta_R, R=10):
+def mark_White(p, b, delta_R,):
     '''calculates the White Mark function with smoothing scale of R MPc
     Parameters:
     p
     b
     delta_R : smoothed field
-    R: smoothing scale, default 10Mpc
+    
     '''
     m = (1 + (delta_R-1)/(1+b))**(-p)
     return(m)
