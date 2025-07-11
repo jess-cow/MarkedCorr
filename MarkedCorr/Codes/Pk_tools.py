@@ -2,9 +2,9 @@ import jax.numpy as jnp
 from jax import grad, jit, vmap
 from jax import random
 import jax
-import nbodykit
+# import nbodykit
 import numpy as np
-from nbodykit.lab import *
+# from nbodykit.lab import *
 import matplotlib.pyplot as plt
 from matplotlib import colors, cm
 import matplotlib

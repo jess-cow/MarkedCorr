@@ -11,8 +11,8 @@ import time
 import pandas as pd
 from math import comb
 
-import nbodykit
-from nbodykit.lab import *
+# import nbodykit
+# from nbodykit.lab import *
 
 from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -24,9 +24,9 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 class Mark(object):
-    def __init__(self, angles, kmax=0.3, kmin=0.01, fom_type='total', lbox=700., ngrid=256, 
+    def __init__(self, angles, kmax=0.3, kmin=0.01, fom_type='total', lbox=700., ngrid=256, directory='/mnt/extraspace/jesscowell/MarkedCorr/Data/Sim_arrays/', 
                  n_nodes=4, l_gp=2.0, A_gp=10.0, jitter_gp=1E-3, w_thr=1E-7, R=10, prefix=''):
-    
+        self.directory = directory
         self.angles = angles
         self.nodes = self.convert_from_angle(self.angles)
         
@@ -133,7 +133,7 @@ class Mark(object):
         delta_R={}
         for name in names:
             #load in the raw density field
-            rho_fields[f'{name}'] = np.load(f'/mnt/extraspace/jesscowell/MarkedCorr/Data/Sim_arrays/{name}_{Nmesh}_arr.npy')
+            rho_fields[f'{name}'] = np.load(f'{self.directory}{name}_{Nmesh}_arr.npy')
             #calculate the overdensity field
             fields[f'{name}'] =  rho_fields[f'{name}']/np.mean(rho_fields[f'{name}']) -1
             #fourier transform overdensity field
@@ -343,14 +343,42 @@ class Mark(object):
             _, _, pk = get_Pk(self.fft_fields[field1_key], self.ktot, second=self.fft_fields[field2_key])
             # Scale cuts
             Pks[f'Pk_{f1}{f2}_{f3}'] = pk[self.good_k][3:]
-        
         return Pks
 
 
 
 
 
-    def get_fom(self, mark_names, fom_type, optimiser=False):
+    def get_fom(self, fom_type='both', mark_names=['m1'], optimiser=False):
+        """
+        Calculate the figure of merit (FOM) and Fisher covariance matrix for given mark functions.
+        This method computes the FOM based on the Fisher information matrix derived from the 
+        derivatives of the mark correlation functions with respect to cosmological parameters.
+        It supports three types of FOM: 'both' (determinant of the Fisher matrix), 's8' 
+        (inverse variance of the first parameter), and 'om' (inverse variance of the second parameter).
+        Parameters
+        ----------
+        fom_type : str
+            Type of figure of merit to compute. Must be one of:
+            - 'both': determinant of the Fisher matrix (joint constraint)
+            - 's8': inverse variance of the first parameter (sigma_8)
+            - 'om': inverse variance of the second parameter (Omega_m)
+        mark_names : list of str, optional
+            List of mark function names to use in the calculation. Default is ['m1'].
+        optimiser : bool, optional
+            If True, returns only the negative FOM (for use in optimisers). 
+            If False, returns both the FOM and the Fisher covariance matrix.
+        Returns
+        -------
+        fom : float
+            The computed figure of merit, or its negative if optimiser=True.
+        fisher_cov : np.ndarray
+            The Fisher covariance matrix (only if optimiser=False).
+        Raises
+        ------
+        ValueError
+            If `fom_type` is not one of 'both', 's8', or 'om'.
+        """
         """Get figure of merit from mark function."""
         # Calculate Pks
         Pks = self.get_all_Pks(mark_names)
